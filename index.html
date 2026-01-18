@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>R6 Callout Guide - 戰術報位圖</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;700&family=Noto+Sans+TC:wght@400;700&display=swap');
+
+        :root {
+            --r6-yellow: #ffb400;
+            --r6-dark: #121212;
+            --r6-card: #1e1e1e;
+        }
+
+        body {
+            background-color: var(--r6-dark);
+            color: #ffffff;
+            font-family: 'Noto Sans TC', 'Oswald', sans-serif;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .map-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            border: 1px solid #333;
+        }
+
+        .map-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--r6-yellow);
+            box-shadow: 0 10px 20px rgba(255, 180, 0, 0.2);
+        }
+
+        .tab-btn.active {
+            background-color: var(--r6-yellow);
+            color: black;
+            font-weight: bold;
+        }
+
+        /* 預設容器樣式：手機端使用 auto 確保捲動流暢 */
+        .image-container {
+            background-image: radial-gradient(#333 1px, transparent 1px);
+            background-size: 20px 20px;
+            position: relative;
+            overflow: hidden;
+            touch-action: auto; 
+        }
+        
+        /* 僅在 PC 端顯示 grab 手勢圖示 */
+        .is-pc .image-container {
+            cursor: grab;
+            touch-action: none; /* PC 端縮放時禁止預設行為 */
+        }
+        
+        .is-pc .image-container:active {
+            cursor: grabbing;
+        }
+
+        #callout-image {
+            transition: transform 0.1s ease-out, opacity 0.3s ease;
+            transform-origin: center;
+            user-select: none;
+            -webkit-user-drag: none;
+            will-change: transform;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 隱藏捲動條但保有功能 */
+        #floor-tabs::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 導覽列 -->
+    <nav class="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold tracking-tighter text-white flex items-center gap-2 cursor-pointer" onclick="showHome()">
+                <span class="bg-yellow-500 text-black px-2 py-0.5 rounded">R6</span> CALLOUTS中文版
+            </h1>
+            <div id="nav-info" class="hidden text-gray-400 text-sm md:text-base">
+                正在瀏覽：<span id="current-map-name" class="text-yellow-500 font-bold"></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 首頁：地圖選擇 -->
+    <main id="home-view" class="max-w-7xl mx-auto p-6 md:p-12 fade-in">
+        <div class="mb-10">
+            <h2 class="text-4xl font-bold mb-4">地圖選擇</h2>
+            <p class="text-gray-400">請選擇一張地圖來查看詳細的樓層報位名稱。</p>
+        </div>
+
+        <div id="map-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <!-- 地圖卡片將由 JS 動態生成 -->
+        </div>
+    </main>
+
+    <!-- 詳細頁：地圖報位圖 -->
+    <main id="detail-view" class="hidden max-w-7xl mx-auto p-4 md:p-8 fade-in">
+        <button onclick="showHome()" class="mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            返回列表
+        </button>
+
+        <div class="flex flex-col lg:flex-row gap-8">
+            <!-- 左側：樓層選擇 -->
+            <div class="w-full lg:w-1/4">
+                <h2 id="detail-title" class="text-4xl md:text-5xl font-bold mb-6 text-yellow-500 uppercase tracking-tight">地圖名稱</h2>
+                <div class="bg-neutral-900 rounded-xl p-4 border border-white/5">
+                    <p class="text-sm text-gray-400 mb-4 uppercase tracking-widest font-bold">樓層選擇</p>
+                    <div id="floor-tabs" class="flex flex-row lg:flex-col gap-2 overflow-x-auto pb-2 lg:pb-0">
+                        <!-- 樓層按鈕由 JS 生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右側：報位圖展示 -->
+            <div class="w-full lg:w-3/4">
+                <div id="zoom-area" class="image-container bg-neutral-900 rounded-2xl border border-white/10 overflow-hidden relative min-h-[400px] md:min-h-[500px] flex items-center justify-center">
+                    <img id="callout-image" src="" alt="樓層報位圖" class="max-w-full h-auto shadow-2xl">
+                    
+                    <!-- 縮放控制器 (僅 PC 端顯示) -->
+                    <div id="reset-btn-container" class="absolute bottom-4 right-4 hidden md:block">
+                        <button onclick="resetZoom()" class="bg-black/60 hover:bg-yellow-500 hover:text-black text-white px-3 py-2 rounded-lg backdrop-blur-md text-sm transition-all border border-white/10">
+                            重設縮放
+                        </button>
+                    </div>
+
+                    <!-- 載入中 -->
+                    <div id="image-loader" class="absolute inset-0 flex items-center justify-center bg-black/50 hidden">
+                        <div class="w-10 h-10 border-4 border-yellow-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                </div>
+                <div class="mt-4 flex flex-col sm:flex-row justify-between items-start sm:items-center text-gray-500 text-xs md:text-sm gap-4">
+                    <span id="floor-label">樓層：無</span>
+                    <span class="flex items-center gap-4">
+                        <span class="flex md:hidden text-gray-400 italic">手機端請使用系統縮放</span>
+                        <span class="hidden md:flex items-center gap-4">
+                            <span class="flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                                滾輪縮放 (PC)
+                            </span>
+                            <span class="flex items-center gap-1">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-3 3-3-3"/><path d="m15 6-3-3-3 3"/><path d="m18 15 3-3-3-3"/><path d="m6 15-3-3 3-3"/></svg>
+                                拖曳平移 (PC)
+                            </span>
+                        </span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-20 p-10 border-t border-white/5 text-center text-gray-600">
+        <p>&copy; 2026 R6 Callout Helper. Credited by ShaZ. Made by Tyrfing。</p>
+    </footer>
+
+    <script>
+        const MAP_DATA = [
+            {
+                id: 'consulate',
+                name: '領事館 (Consulate)',
+                thumbnail: 'https://duk.tw/XyjpR1.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1462349975739695198/8b7fe1f7eb04feae.jpg?ex=696ddf0b&is=696c8d8b&hm=969e9bfe07b2a548a7c0a3f0cdf086303a8be0e111d9b2c1260c6758bb848297&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1462349945460752516/1d35cb7359f1cb93.jpg?ex=696ddf04&is=696c8d84&hm=d807ef71987b139552fae0b749943d11b977358073089c1d45fbd986648b197a&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1462349824446697647/178e3e287376151c.jpg?ex=696ddee7&is=696c8d67&hm=accb01d6895939000eb20d8b66d95b53006d1259371ed282b23310edc0eea51e&' }
+                ]
+            },
+            {
+                id: 'lair',
+                name: '賊窩 (Lair)',
+                thumbnail: 'https://duk.tw/OlINxJ.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1439702549287669800/8aeacef8bca3333d.jpg?ex=696de0bc&is=696c8f3c&hm=771c42518c6e6bb0051c30758a6acf4caec3c0c14c6541a7bdc4d9064006948f&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1439701756438249643/77cdde0fdf0603ad.jpg?ex=696ddfff&is=696c8e7f&hm=e1459e1b136499fb265347b4f1aa447407e2d0863f13777a503e0919c0e293a0&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1439701722111934584/c74f5e8b76e218a6.jpg?ex=696ddff6&is=696c8e76&hm=9de357308bc80106ac6e26bf60810876e1f6da7587c2f7205d8874fe18c83645&' }
+                ]
+            },
+            {
+                id: 'clubhouse',
+                name: '俱樂部 (Clubhouse)',
+                thumbnail: 'https://duk.tw/xq4LMF.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1433147718154457088/192bf28b656039c9.jpg?ex=696dc312&is=696c7192&hm=2a43edc822fc74247b2ad1a1dbdb64efb352ef02227fc1e3566967eec7084d76&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1433147681899020308/ca069d216380893f.jpg?ex=696dc309&is=696c7189&hm=ded10aa58f292fab1a39efc0af459502b36e960a0806fa05f89081d43b17827f&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1433147654774194206/b3f2a442c8ecf8b1.jpg?ex=696dc303&is=696c7183&hm=6d0c6b9c9e9737114b5a2e311daa1d91076a5494b9b3cb6aa6ee12ca453e1a39&' }
+                ]
+            },
+            {
+                id: 'theme park',
+                name: '主題樂園 (Theme Park)',
+                thumbnail: 'https://duk.tw/KYdK5W.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1431908952890933320/8c94962f8fdcb454.jpg?ex=696ddea1&is=696c8d21&hm=8952b49fe99ef51acded28a8c29787c47c481bc37a7fb1700e1e11cbc20090ed&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1431908920380751913/3a0cc6434dff0949.jpg?ex=696dde9a&is=696c8d1a&hm=1718fe3564645a0441e5f5c6c2c159148a580bca8696798265714b889dc69268&' }
+                ]
+            },
+            {
+                id: 'skyscraper',
+                name: '摩天大樓 (Skyscraper)',
+                thumbnail: 'https://duk.tw/j1zijB.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1431008411809742952/da3275ffb9fb561e.jpg?ex=696de3b0&is=696c9230&hm=72fde228a0ac69247b080dab71aec27da86bffec7f36e96652b94eb813312431&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1431008379924643840/eab2c388d8ddb4be.jpg?ex=696de3a8&is=696c9228&hm=ca202a7982d7bea16656dcafdafa9b937a9b58de4c77193e65e6e41cdbbc64c7&' }
+                ]
+            },
+            {
+                id: 'chalet',
+                name: '木屋 (Chalet)',
+                thumbnail: 'https://duk.tw/DA7nEM.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1426513646439239720/ea6abae68f3e848b.jpg?ex=696d5b9c&is=696c0a1c&hm=4efc9e636512ef1b2fa4e2990bdf4346535179f65bae522fa7d828aedab01b38&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1426513612998053949/6b506539cd6a9c18.jpg?ex=696d5b94&is=696c0a14&hm=ca6fe434bcdda72b94d4f34d05c0f3ea61298adaff77df221d5e507233b42fb3&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1426513566877352067/65a36754578d9d89.jpg?ex=696d5b89&is=696c0a09&hm=75d5493529d90b2f6c1c1b9bede27539f456ffd5edaccf07f324036d2456b1bf&' }
+                ]
+            },
+            {
+                id: 'kanal',
+                name: '運河 (Kanal)',
+                thumbnail: 'https://duk.tw/NlgKVb.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1423924260371697776/4f636ca238b84b6b.jpg?ex=696dd34e&is=696c81ce&hm=1ad220a06b618cee834149e5793c9b24095ceae3d9841d6db3efe51c43676066&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1423924231376207892/58b90640e6a9e987.jpg?ex=696dd347&is=696c81c7&hm=1877bc443e51b35267b89a1e044bafe7981e702b7d465151f6e24d4e6ec895b9&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1423924199453626398/d12abb128e50509d.jpg?ex=696dd340&is=696c81c0&hm=e6d8169324111fd8fec3a7e46f45d7db86c602be41839c44ee16bc1fcf72cb83&' }
+                ]
+            },
+            {
+                id: 'oregon',
+                name: '奧勒岡 (Oregon)',
+                thumbnail: 'https://duk.tw/4mSaPu.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1423380964767432838/3cdf307555dceaab.jpg?ex=696dd393&is=696c8213&hm=1a657b97b5bf284a96803cc79efd467368671523c14516bf25365f3d2030f625&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1423380936556286122/deb8159eb15f91d1.jpg?ex=696dd38c&is=696c820c&hm=061a8975da0baf59c781a8591ae3d0124fab1d449bcdc7ddccf05da7719abf19&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1423380900334276758/5bbfb41d3cc5c04c.jpg?ex=696dd383&is=696c8203&hm=a81e82d5dab6d475cc889ab2fb6b4ebd7f39176f72c57e6b46516027cda87ad5&' }
+                ]
+            },
+            {
+                id: 'nighthaven labs',
+                name: '實驗室 (Nighthaven Labs)',
+                thumbnail: 'https://duk.tw/OXiA4b.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422232143173783563/9f5a13ddde9b6c14.jpg?ex=696d9a26&is=696c48a6&hm=595d2fcd1560bed6532ef4111ea277761d052c6b8f1f5355121f95767a61a6c3&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422232108016996543/9164dc7f4aa910ba.jpg?ex=696d9a1e&is=696c489e&hm=ba9dca7ada3b72b5b04bd3bf928a8a5a5744d5009b01f8a1f7308bf00805d298&' },
+                    { label: 'B1', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422232079067910144/4531882e34dad052.jpg?ex=696d9a17&is=696c4897&hm=977b243ca3e21eb76c6cb1358a8cca1eb56fdd1dd64123a98a3276cb59fd30c9&' }
+                ]
+            },
+            {
+                id: 'coastline',
+                name: '海岸線 (Coastline)',
+                thumbnail: 'https://duk.tw/lyE3BC.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422113902220804117/9fd2a7ac660db4d3.jpg?ex=696dd4c7&is=696c8347&hm=3d2c26a1ac7c3a97e866f89f298ceb029ba418f682bc012cd6f9641c4293fb07&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422113868817109073/96e3695ed84153c6.jpg?ex=696dd4bf&is=696c833f&hm=934e4f85555ef2e87792297d4e8f406b4e784e09fde2a09a5668cf1b23733f8c&' }
+                ]
+            },
+            {
+                id: 'border',
+                name: '邊境 (Border)',
+                thumbnail: 'https://duk.tw/HrC5TH.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422080994579841095/a7f5db4957f772ed.jpg?ex=696db622&is=696c64a2&hm=81deef02cb3fa6ac71a2e744e90d3d9bf094099bd0c3accf11c6b967a183ff37&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422080959549018173/a5ea2bd9f6adfb89.jpg?ex=696db619&is=696c6499&hm=587dfb0232807dfc9e3dc3a60263399acdcc89c350726c5110f9982486c986b9&' }
+                ]
+            },
+            {
+                id: 'kafe',
+                name: '咖啡館 (Kafe)',
+                thumbnail: 'https://duk.tw/3MzLcN.png',
+                floors: [
+                    { label: '3F', img: 'https://media.discordapp.net/attachments/1422079339218079765/1422080818246979666/b3605338ff8216fb.jpg?ex=696db5f8&is=696c6478&hm=1d1913d7e1800edebde838cb01c0ce11bc8c7046dd1ee101dd9d494fdf26444c&=&format=webp&width=1341&height=942' },
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422080790032027770/8c7b00f59430e90e.jpg?ex=696db5f1&is=696c6471&hm=e9e427f4f37cd76524d0c398477c36c1bc451c809b7bb57da63914949322639a&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1422080754464198769/7602187cf88986d9.jpg?ex=696db5e8&is=696c6468&hm=818e8da058dbf281762609d2797ada3a37c48a8f4e7b8ff4755e94c1edabd663&' }
+                ]
+            },
+            {
+                id: 'fortress',
+                name: '要塞 (Fortress)',
+                thumbnail: 'https://duk.tw/hGdxZs.png',
+                floors: [
+                    { label: '2F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1446159154728407235/2F.jpg?ex=696da2ea&is=696c516a&hm=5361d8da1af8fa3baa834cc9d53a361b7f0631e091601692de69d8979b2657db&' },
+                    { label: '1F', img: 'https://cdn.discordapp.com/attachments/1422079339218079765/1446159127826137249/1F.jpg?ex=696da2e4&is=696c5164&hm=ad1ee8fac4c98666038cb0fd1eb34ca9dfa2d7cbfde6fa8b548be242e32df28c&' }
+                ]
+            },
+            {
+                id: 'bank',
+                name: '銀行 (Bank) 待上傳',
+                thumbnail: 'https://duk.tw/r4W7jh.png',
+                floors: [
+                    { label: '2F', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Bank+2F+Callouts' },
+                    { label: '1F', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Bank+1F+Callouts' },
+                    { label: 'B1', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Bank+B1+Callouts' }
+                ]
+            },
+            {
+                id: 'outback',
+                name: '荒漠 (Outback) 待上傳',
+                thumbnail: 'https://duk.tw/jexSuG.png',
+                floors: [
+                    { label: '2F', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Outback+2F+Callouts' },
+                    { label: '1F', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Outback+1F+Callouts' },
+                    { label: 'B1', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Outback+B1+Callouts' }
+                ]
+            },
+            {
+                id: 'villa',
+                name: '別墅 (Villa) 待上傳',
+                thumbnail: 'https://duk.tw/AldapL.png',
+                floors: [
+                    { label: '2F', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Villa+2F+Callouts' },
+                    { label: '1F', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Villa+1F+Callouts' },
+                    { label: 'B1', img: 'https://placehold.co/1200x800/1e1e1e/ffb400?text=Villa+B1+Callouts' }
+                ]
+            }
+        ];
+
+        let currentMap = null;
+        let zoomState = { scale: 1, translateX: 0, translateY: 0, isDragging: false, startX: 0, startY: 0 };
+
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+
+        function initHome() {
+            if (!isTouchDevice) document.body.classList.add('is-pc');
+            const grid = document.getElementById('map-grid');
+            grid.innerHTML = '';
+            
+            MAP_DATA.forEach(map => {
+                const card = document.createElement('div');
+                card.className = 'map-card bg-neutral-900 rounded-xl overflow-hidden cursor-pointer group';
+                card.onclick = () => openMap(map.id);
+                
+                card.innerHTML = `
+                    <div class="relative h-48 overflow-hidden hidden md:block">
+                        <img src="${map.thumbnail}" alt="${map.name}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-90 group-hover:opacity-100">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black to-transparent opacity-80"></div>
+                    </div>
+                    <div class="p-5">
+                        <h3 class="text-xl font-bold group-hover:text-yellow-500 transition-colors">${map.name}</h3>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        function openMap(mapId) {
+            currentMap = MAP_DATA.find(m => m.id === mapId);
+            if (!currentMap) return;
+
+            resetZoom();
+            document.getElementById('home-view').classList.add('hidden');
+            document.getElementById('detail-view').classList.remove('hidden');
+            document.getElementById('nav-info').classList.remove('hidden');
+            document.getElementById('current-map-name').innerText = currentMap.name;
+            document.getElementById('detail-title').innerText = currentMap.name;
+
+            const tabContainer = document.getElementById('floor-tabs');
+            tabContainer.innerHTML = '';
+            currentMap.floors.forEach((floor, index) => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn p-3 rounded-lg text-left transition-all whitespace-nowrap lg:whitespace-normal ${index === 0 ? 'active' : 'bg-white/5 hover:bg-white/10 text-gray-300'}`;
+                btn.innerText = floor.label;
+                btn.onclick = () => selectFloor(index, btn);
+                tabContainer.appendChild(btn);
+            });
+
+            selectFloor(0);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function selectFloor(index, btnElement) {
+            const floor = currentMap.floors[index];
+            const img = document.getElementById('callout-image');
+            const loader = document.getElementById('image-loader');
+            const label = document.getElementById('floor-label');
+
+            resetZoom(); 
+            if (btnElement) {
+                document.querySelectorAll('.tab-btn').forEach(b => {
+                    b.classList.remove('active', 'bg-yellow-500', 'text-black');
+                    b.classList.add('bg-white/5', 'text-gray-300');
+                });
+                btnElement.classList.add('active');
+            }
+
+            loader.classList.remove('hidden');
+            img.style.opacity = '0.3';
+            img.onload = () => { img.style.opacity = '1'; loader.classList.add('hidden'); };
+            img.src = floor.img;
+            label.innerText = `樓層：${floor.label}`;
+        }
+
+        function showHome() {
+            document.getElementById('home-view').classList.remove('hidden');
+            document.getElementById('detail-view').classList.add('hidden');
+            document.getElementById('nav-info').classList.add('hidden');
+            resetZoom();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        const zoomArea = document.getElementById('zoom-area');
+        const zoomImage = document.getElementById('callout-image');
+
+        function updateImageTransform() {
+            zoomImage.style.transform = `translate(${zoomState.translateX}px, ${zoomState.translateY}px) scale(${zoomState.scale})`;
+        }
+
+        function resetZoom() {
+            zoomState = { scale: 1, translateX: 0, translateY: 0, isDragging: false, startX: 0, startY: 0 };
+            updateImageTransform();
+        }
+
+        /**
+         * 桌面端 PC 專屬邏輯 (滑鼠滾輪與拖曳)
+         */
+        if (!isTouchDevice) {
+            zoomArea.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const delta = e.deltaY > 0 ? -0.15 : 0.15;
+                const newScale = Math.min(Math.max(zoomState.scale + delta, 1), 5);
+                if (newScale !== zoomState.scale) {
+                    zoomState.scale = newScale;
+                    if (zoomState.scale === 1) { zoomState.translateX = 0; zoomState.translateY = 0; }
+                    updateImageTransform();
+                }
+            }, { passive: false });
+
+            zoomArea.addEventListener('mousedown', (e) => {
+                if (zoomState.scale > 1) {
+                    zoomState.isDragging = true;
+                    zoomState.startX = e.clientX - zoomState.translateX;
+                    zoomState.startY = e.clientY - zoomState.translateY;
+                }
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (zoomState.isDragging && zoomState.scale > 1) {
+                    zoomState.translateX = e.clientX - zoomState.startX;
+                    zoomState.translateY = e.clientY - zoomState.startY;
+                    updateImageTransform();
+                }
+            });
+
+            window.addEventListener('mouseup', () => { zoomState.isDragging = false; });
+        }
+
+        window.onload = initHome;
+    </script>
+</body>
+</html>
