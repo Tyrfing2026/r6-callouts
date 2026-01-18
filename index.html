@@ -86,7 +86,7 @@
 
     <!-- 導覽列 -->
     <nav class="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 p-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
+        <div class="max-w-[95%] mx-auto flex justify-between items-center">
             <h1 class="text-2xl font-bold tracking-tighter text-white flex items-center gap-2 cursor-pointer" onclick="showHome()">
                 <span class="bg-yellow-500 text-black px-2 py-0.5 rounded">R6</span> CALLOUTS中文版
             </h1>
@@ -97,7 +97,7 @@
     </nav>
 
     <!-- 首頁：地圖選擇 -->
-    <main id="home-view" class="max-w-7xl mx-auto p-6 md:p-12 fade-in">
+    <main id="home-view" class="max-w-[95%] mx-auto p-6 md:p-12 fade-in">
         <div class="mb-10">
             <h2 class="text-4xl font-bold mb-4">地圖選擇</h2>
             <p class="text-gray-400">請選擇一張地圖來查看詳細的樓層報位名稱。</p>
@@ -109,7 +109,7 @@
     </main>
 
     <!-- 詳細頁：地圖報位圖 -->
-    <main id="detail-view" class="hidden max-w-7xl mx-auto p-4 md:p-8 fade-in">
+    <main id="detail-view" class="hidden max-w-[95%] mx-auto p-4 md:p-8 fade-in">
         <button onclick="showHome()" class="mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
@@ -131,7 +131,7 @@
 
             <!-- 右側：報位圖展示 -->
             <div class="w-full lg:w-3/4">
-                <div id="zoom-area" class="image-container bg-neutral-900 rounded-2xl border border-white/10 overflow-hidden relative min-h-[400px] md:min-h-[500px] flex items-center justify-center">
+                <div id="zoom-area" class="image-container bg-neutral-900 rounded-2xl border border-white/10 overflow-hidden relative min-h-[400px] xl:min-h-[850px] flex items-center justify-center">
                     <img id="callout-image" src="" alt="樓層報位圖" class="max-w-full h-auto shadow-2xl">
                     
                     <!-- 縮放控制器 (僅 PC 端顯示) -->
@@ -465,3 +465,4 @@
     </script>
 </body>
 </html>
+
