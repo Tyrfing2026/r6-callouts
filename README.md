@@ -1,7 +1,5 @@
 # 🎮 R6 Tactical Callout Guide
 ### 競技射擊遊戲：視覺化戰術溝通工具
-git clone [https://github.com/Tyrfing2026/r6-callouts.git](https://github.com/Tyrfing2026/r6-callouts.git)
-cd r6-callouts
 [![GitHub Pages](https://img.shields.io/badge/Live-Demo-brightgreen?style=for-the-badge)](https://tyrfing2026.github.io/r6-callouts/)
 [![Framework](https://img.shields.io/badge/Framework-Tailwind_CSS-blue?style=for-the-badge)](https://tailwindcss.com/)
 
