@@ -33,12 +33,3 @@
 * **部署平台**: GitHub Pages.
 
 ---
-
-## 📁 專案目錄結構
-
-```text
-├── assets/         # 存放地圖素材、點位圖檔與視覺資源
-├── css/            # Tailwind CSS 編譯後的樣式文件
-├── js/             # 處理地圖切換邏輯與互動 DOM 操作
-├── index.html      # 主要產品頁面
-└── README.md       # 專案文件
